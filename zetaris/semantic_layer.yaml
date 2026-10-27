@@ -1,0 +1,34 @@
+# FlowGuard unified semantic layer for Zetaris (Lightning data virtualisation)
+# ---------------------------------------------------------------------------
+# Zetaris sits over the hospital's fragmented source systems and exposes ONE
+# governed semantic model. FlowGuard never queries a source system directly;
+# it queries these semantic entities only. In a hospital deployment the
+# sources below are connected in Zetaris Cloud Gateway (JDBC / REST); in the
+# offline judging demo the same semantic queries resolve to the bundled
+# synthetic dataset (see src/flowguard/adapters/zetaris.py).
+#
+# Sources (fragmented in every real hospital):
+#   adt_feed        - admissions / discharges / transfers system
+#   bed_board       - bed management system (unit, capability, occupancy)
+#   vitals_stream   - triage vitals captured in the EHR
+#   staffing_roster - nurse roster (ratio feasibility per unit)
+
+semantic_model:
+  entities:
+    ed_waiting_list:
+      description: One row per patient currently waiting in the ED
+      sources:
+        - adt_feed.arrivals        (patient_id, arrival_mode, minutes_waiting)
+        - vitals_stream.triage     (heart_rate, resp_rate, spo2, systolic_bp, temperature_c, pain_score)
+        - adt_feed.presentations   (chief_complaint, isolation_needed, telemetry_needed, icu_risk_factors)
+      key: patient_id
+    bed_board:
+      description: One row per inpatient bed with capability flags
+      sources:
+        - bed_board.beds           (bed_id, unit, occupied)
+        - bed_board.capabilities   (isolation_capable, telemetry_capable)
+        - staffing_roster.units    (nurse_ratio_ok)
+      key: bed_id
+  governed_rules:
+    - Patients are synthetic in the demo; no PHI is ever placed in the layer.
+    - The agent receives only the fields listed above (minimum necessary).
