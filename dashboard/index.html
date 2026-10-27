@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowGuard - ED Boarding-to-Bed Agent</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: #0b1220; color: #e6edf3; }
+  header { padding: 20px 28px 6px; }
+  h1 { margin: 0; font-size: 26px; } .sub { color: #8b98a9; margin-top: 4px; }
+  .bar { display: flex; gap: 12px; padding: 14px 28px; align-items: center; flex-wrap: wrap; }
+  button { background: #1f6feb; color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; font-size: 14px; cursor: pointer; }
+  button.secondary { background: #263143; }
+  .stat { background: #111a2c; border: 1px solid #22314d; border-radius: 10px; padding: 8px 14px; }
+  .stat b { font-size: 18px; }
+  main { padding: 4px 28px 28px; display: grid; grid-template-columns: 1fr; gap: 16px; }
+  table { width: 100%; border-collapse: collapse; background: #0f1728; border: 1px solid #22314d; border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #1b2942; font-size: 14px; vertical-align: top; }
+  th { background: #13203a; color: #aebdd2; font-weight: 600; }
+  .risk-critical { color: #ff6b6b; font-weight: 700; } .risk-high { color: #ffa94d; font-weight: 700; }
+  .risk-moderate { color: #ffd43b; } .risk-low { color: #69db7c; }
+  .assign { color: #69db7c; font-weight: 700; } .escalate { color: #ff6b6b; font-weight: 700; }
+  .why { color: #8b98a9; font-size: 12.5px; }
+  pre { background: #0f1728; border: 1px solid #22314d; border-radius: 12px; padding: 14px; white-space: pre-wrap; font-size: 13px; }
+  h2 { font-size: 17px; margin: 4px 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>FlowGuard</h1>
+  <div class="sub">ED boarding-to-bed agent &middot; Team Rohit &middot; Open Agent Hackathon 2026 &middot; synthetic data only, decision support only</div>
+</header>
+<div class="bar">
+  <button onclick="load(0)">Run agent: normal census</button>
+  <button class="secondary" onclick="load(1)">Run agent: surge (few beds)</button>
+  <span class="stat">Patients <b id="s-pat">-</b></span>
+  <span class="stat">Placed <b id="s-place">-</b></span>
+  <span class="stat">Escalated <b id="s-esc">-</b></span>
+</div>
+<main>
+  <section><h2>Agent recommendations, highest boarding risk first</h2><div id="table">Loading...</div></section>
+  <section><h2>Shift handoff (generated)</h2><pre id="handoff">-</pre></section>
+</main>
+<script>
+async function load(surge) {
+  const res = await fetch('/api/run?surge=' + surge);
+  const data = await res.json();
+  const rows = data.results;
+  document.getElementById('s-pat').textContent = rows.length;
+  document.getElementById('s-place').textContent = rows.filter(r => r.recommendation.action === 'assign').length;
+  document.getElementById('s-esc').textContent = data.escalations;
+  let html = '<table><tr><th>Patient</th><th>Complaint</th><th>ESI</th><th>Boarding risk</th><th>Decision</th><th>Why (auditable rationale)</th></tr>';
+  for (const r of rows) {
+    const p = r.patient, a = r.assessment, rec = r.recommendation;
+    html += '<tr><td>' + p.patient_id + '<br><span class="why">' + p.age + p.sex + ', waited ' + p.minutes_waiting + ' min</span></td>' +
+      '<td>' + p.chief_complaint + '</td><td>' + a.esi_level + '</td>' +
+      '<td class="risk-' + a.boarding_risk + '">' + a.boarding_risk_score + ' ' + a.boarding_risk + '</td>' +
+      '<td class="' + rec.action + '">' + rec.action.toUpperCase() + (rec.bed_id ? '<br>' + rec.unit + ' ' + rec.bed_id : '') + '</td>' +
+      '<td class="why">' + rec.rationale.join('<br>') + (rec.escalation_flags.length ? '<br><b>Flags:</b> ' + rec.escalation_flags.join(' ') : '') + '</td></tr>';
+  }
+  document.getElementById('table').innerHTML = html + '</table>';
+  document.getElementById('handoff').textContent = data.handoff;
+}
+load(0);
+</script>
+</body>
+</html>
